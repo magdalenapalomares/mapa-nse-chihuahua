@@ -13,43 +13,43 @@ st.markdown("Herramienta para identificar el NSE predominante por AGEB.")
 # 1. Cargar datos
 @st.cache_data
 def cargar_datos():
-    # Cargar mapa
+    # Cargar mapa (Shapefile)
     gdf = gpd.read_file("08a.shp")
-    # Convertir a coordenadas GPS (Lat/Lon)
-    gdf = gdf.to_crs(epsg=4326) 
+    gdf = gdf.to_crs(epsg=4326) # Convertir a GPS
     
-    # Cargar datos AMAI
+    # Cargar datos AMAI (CSV)
     df = pd.read_csv("NSE_AGEB_Chihuahua_Ready.csv", dtype={'CVEGEO': str})
     
-    # Unir
+    # Unir ambos
     mapa_final = gdf.merge(df, on="CVEGEO", how="inner")
     return mapa_final
 
 try:
     data = cargar_datos()
     
-    # 2. Filtros
+    # 2. Filtros en la barra lateral
     st.sidebar.header("Filtros")
     
-    # Lista de municipios disponibles
-    municipios = sorted(data['CVE_MUN'].unique())
-    seleccion_mun = st.sidebar.selectbox("Selecciona un Municipio (Clave):", municipios)
+    # --- CAMBIO AQUÍ: Usamos 'NOMBRE MUNICIPIO' en lugar de la clave ---
+    lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
+    seleccion_nombre = st.sidebar.selectbox("Selecciona un Municipio:", lista_nombres)
     
-    # Filtrar datos
-    data_filtrada = data[data['CVE_MUN'] == seleccion_mun]
+    # Filtramos los datos usando el nombre seleccionado
+    data_filtrada = data[data['NOMBRE MUNICIPIO'] == seleccion_nombre]
     
-    # Métricas
+    # Métricas rápidas
     st.sidebar.metric("Total AGEBs en zona", len(data_filtrada))
+    st.sidebar.write(f"Viviendas analizadas: {data_filtrada['VIVIENDAS'].sum():,}")
 
-    # 3. Mapa
+    # 3. Mapa Interactivo
     if not data_filtrada.empty:
         # Centrar mapa
         lat_centro = data_filtrada.geometry.centroid.y.mean()
         lon_centro = data_filtrada.geometry.centroid.x.mean()
         
-        m = folium.Map(location=[lat_centro, lon_centro], zoom_start=12)
+        m = folium.Map(location=[lat_centro, lon_centro], zoom_start=13)
 
-        # Colores
+        # Paleta de colores
         colores_nse = {
             'AB': '#006400', 'C+': '#32CD32', 'C': '#ADFF2F',
             'C-': '#FFFF00', 'D+': '#FFA500', 'D': '#FF4500', 'E': '#FF0000'
@@ -64,15 +64,19 @@ try:
                 'fillOpacity': 0.7
             }
 
+        # --- MEJORA: Tooltip con Nombre del Municipio ---
         folium.GeoJson(
             data_filtrada,
             style_function=style_function,
-            tooltip=folium.GeoJsonTooltip(fields=['CVEGEO', 'NIVEL PREDOMINANTE'])
+            tooltip=folium.GeoJsonTooltip(
+                fields=['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE'],
+                aliases=['Clave AGEB:', 'Municipio:', 'NSE Predominante:']
+            )
         ).add_to(m)
 
         st_folium(m, width="100%", height=600)
     else:
-        st.warning("No hay datos para mostrar en este municipio.")
+        st.warning("No hay datos para mostrar.")
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"Error al cargar: {e}")
