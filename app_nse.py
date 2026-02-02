@@ -20,6 +20,10 @@ def cargar_datos():
     # Cargar datos AMAI (CSV)
     df = pd.read_csv("NSE_AGEB_Chihuahua_Ready.csv", dtype={'CVEGEO': str})
     
+    # --- CORRECCIÓN: Limpiar columna de viviendas ---
+    # Convertimos a números y los errores (texto) se vuelven 0
+    df['VIVIENDAS'] = pd.to_numeric(df['VIVIENDAS'], errors='coerce').fillna(0)
+    
     # Unir ambos
     mapa_final = gdf.merge(df, on="CVEGEO", how="inner")
     return mapa_final
@@ -30,16 +34,19 @@ try:
     # 2. Filtros en la barra lateral
     st.sidebar.header("Filtros")
     
-    # --- CAMBIO AQUÍ: Usamos 'NOMBRE MUNICIPIO' en lugar de la clave ---
+    # Usamos 'NOMBRE MUNICIPIO' en lugar de la clave
     lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
     seleccion_nombre = st.sidebar.selectbox("Selecciona un Municipio:", lista_nombres)
     
-    # Filtramos los datos usando el nombre seleccionado
+    # Filtramos los datos
     data_filtrada = data[data['NOMBRE MUNICIPIO'] == seleccion_nombre]
     
     # Métricas rápidas
     st.sidebar.metric("Total AGEBs en zona", len(data_filtrada))
-    st.sidebar.write(f"Viviendas analizadas: {data_filtrada['VIVIENDAS'].sum():,}")
+    
+    # Suma de viviendas formateada con comas
+    total_viviendas = int(data_filtrada['VIVIENDAS'].sum())
+    st.sidebar.write(f"🏠 **Viviendas analizadas:** {total_viviendas:,}")
 
     # 3. Mapa Interactivo
     if not data_filtrada.empty:
@@ -64,13 +71,13 @@ try:
                 'fillOpacity': 0.7
             }
 
-        # --- MEJORA: Tooltip con Nombre del Municipio ---
+        # Tooltip con Nombre del Municipio
         folium.GeoJson(
             data_filtrada,
             style_function=style_function,
             tooltip=folium.GeoJsonTooltip(
-                fields=['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE'],
-                aliases=['Clave AGEB:', 'Municipio:', 'NSE Predominante:']
+                fields=['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS'],
+                aliases=['Clave AGEB:', 'Municipio:', 'NSE Predominante:', 'Viviendas:']
             )
         ).add_to(m)
 
