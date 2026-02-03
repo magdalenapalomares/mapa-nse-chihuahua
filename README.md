@@ -2,7 +2,7 @@
 
 Una aplicación interactiva de **Geomarketing** que permite visualizar la distribución de niveles socioeconómicos a nivel de vecindario (AGEB) en el estado de Chihuahua, México.
 
-🔗 **[Prueba la App en vivo aquí](https://share.streamlit.io/TU_USUARIO/TU_REPOSITORIO)**
+🔗 **[Prueba la App en vivo aquí](https://mapa-nse-chihuahua.streamlit.app/  )**
 
 ## Objetivo
 Transformar datos demográficos complejos en inteligencia de mercado accionable. La herramienta cruza la información estadística de la **AMAI** con la cartografía digital del **INEGI** para facilitar la toma de decisiones basada en datos.
