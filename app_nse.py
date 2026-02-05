@@ -20,7 +20,15 @@ def cargar_datos():
     gdf = gpd.read_file("08a.shp")
     gdf = gdf.to_crs(epsg=4326)
     df = pd.read_csv("NSE_AGEB_Chihuahua_Ready.csv", dtype={'CVEGEO': str})
+    
+    # --- CORRECCIÓN DE DATOS (COMAS Y N/D) ---
+    # 1. Convertimos a texto para poder manipular
+    df['VIVIENDAS'] = df['VIVIENDAS'].astype(str)
+    # 2. Quitamos las comas (ej: "1,200" -> "1200")
+    df['VIVIENDAS'] = df['VIVIENDAS'].str.replace(',', '')
+    # 3. Convertimos a números (los errores o N/D se vuelven 0)
     df['VIVIENDAS'] = pd.to_numeric(df['VIVIENDAS'], errors='coerce').fillna(0)
+    
     mapa_final = gdf.merge(df, on="CVEGEO", how="inner")
     return mapa_final
 
@@ -35,10 +43,10 @@ try:
     # Filtrar datos por municipio
     data_filtrada = data[data['NOMBRE MUNICIPIO'] == seleccion_nombre]
     
-    # Métricas
-    st.sidebar.metric("Total AGEBs en municipio", len(data_filtrada))
+    # Métricas GENERALES (Del Municipio)
+    st.sidebar.metric("Total AGEBs en Municipio", len(data_filtrada))
     total_viviendas = int(data_filtrada['VIVIENDAS'].sum())
-    st.sidebar.write(f"🏠 **Viviendas totales:** {total_viviendas:,}")
+    st.sidebar.write(f"🏠 **Viviendas (Municipio):** {total_viviendas:,}")
     st.sidebar.markdown("---")
 
     # --- CEREBRO (SESSION STATE) ---
@@ -48,7 +56,6 @@ try:
     if 'marcador_memoria' not in st.session_state: st.session_state['marcador_memoria'] = None
     if 'ultimo_municipio' not in st.session_state: st.session_state['ultimo_municipio'] = None
 
-    # Resetear vista si cambia el municipio
     if seleccion_nombre != st.session_state['ultimo_municipio']:
         if not data_filtrada.empty:
             st.session_state['lat_vista'] = data_filtrada.geometry.centroid.y.mean()
@@ -64,7 +71,7 @@ try:
         boton_buscar = st.form_submit_button("Buscar 📍")
 
     if boton_buscar and direccion_input:
-        geolocator = Nominatim(user_agent="app_nse_chihuahua_pro")
+        geolocator = Nominatim(user_agent="app_nse_chihuahua_pro_v2")
         direccion_completa = f"{direccion_input}, {seleccion_nombre}, Chihuahua, México"
         try:
             location = geolocator.geocode(direccion_completa, timeout=10)
@@ -80,7 +87,7 @@ try:
             st.error("Error de conexión.")
 
     # ==========================================
-    # 3. MAPA CON HERRAMIENTAS DE DIBUJO
+    # 3. MAPA
     # ==========================================
     if not data_filtrada.empty:
         m = folium.Map(
@@ -97,7 +104,6 @@ try:
             nse = feature['properties']['NIVEL PREDOMINANTE']
             return {'fillColor': colores_nse.get(nse, 'gray'), 'color': 'black', 'weight': 0.5, 'fillOpacity': 0.6}
 
-        # Capa base de AGEBs
         folium.GeoJson(
             data_filtrada,
             style_function=style_function,
@@ -107,12 +113,10 @@ try:
             )
         ).add_to(m)
 
-        # Pin de búsqueda
         if st.session_state['marcador_memoria']:
             p = st.session_state['marcador_memoria']
             folium.Marker([p['lat'], p['lon']], icon=folium.Icon(color="red"), popup=p['texto']).add_to(m)
 
-        # --- 🍺 HERRAMIENTA DE DIBUJO (DRAW) ---
         draw = Draw(
             export=False,
             position='topleft',
@@ -121,50 +125,46 @@ try:
         )
         draw.add_to(m)
 
-        # Renderizar mapa y capturar interacción
         output_mapa = st_folium(m, width="100%", height=600)
 
         # ==========================================
-        # 4. LÓGICA DE DESCARGA POR SELECCIÓN
+        # 4. CÁLCULO DE SELECCIÓN (CORREGIDO)
         # ==========================================
-        st.markdown("### 📥 Descarga de Datos por Zona")
-        st.info("Usa las herramientas de dibujo en la izquierda del mapa (Cuadrado, Polígono o Círculo) para seleccionar un área.")
-
-        # Verificar si el usuario dibujó algo
         if output_mapa and 'last_active_drawing' in output_mapa and output_mapa['last_active_drawing'] is not None:
             geometry_data = output_mapa['last_active_drawing']['geometry']
-            
-            # Convertir el dibujo (GeoJSON) a una forma geométrica de Python (Shapely)
             poligono_usuario = shape(geometry_data)
             
-            # --- FILTRO ESPACIAL ---
-            # Buscamos qué AGEBs intersectan (tocan o están dentro) del dibujo
-            # Usamos data_filtrada para solo buscar en el municipio actual (más rápido)
-            agebs_seleccionados = data_filtrada[data_filtrada.geometry.intersects(poligono_usuario)]
+            # --- CAMBIO IMPORTANTE: Usamos 'within' (dentro) en vez de 'intersects' ---
+            # OJO: 'within' es muy estricto (todo el poligono debe estar dentro). 
+            # 'intersects' es muy laxo (basta que toque).
+            # El punto medio es usar el CENTROIDE. Si el centro del AGEB está en tu dibujo, cuenta.
+            
+            # Buscamos AGEBs cuyo centroide esté dentro del dibujo
+            agebs_seleccionados = data_filtrada[data_filtrada.geometry.centroid.within(poligono_usuario)]
             
             cantidad_sel = len(agebs_seleccionados)
+            viviendas_sel = int(agebs_seleccionados['VIVIENDAS'].sum()) # Suma de la selección
             
             if cantidad_sel > 0:
-                st.success(f"✅ ¡Selección exitosa! Has capturado **{cantidad_sel} AGEBs** dentro de tu zona.")
+                # Mostramos métricas específicas de la selección
+                col1, col2 = st.columns(2)
+                col1.metric("AGEBs Seleccionados", cantidad_sel)
+                col2.metric("Viviendas en Selección", f"{viviendas_sel:,}") # Aquí está el dato que buscabas
                 
-                # Mostrar vista previa
-                with st.expander("Ver tabla de datos seleccionados"):
-                    # Limpiamos columnas raras antes de mostrar
+                with st.expander("Ver desglose de datos"):
                     cols_mostrar = ['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS', 'AB', 'C+', 'C', 'D+', 'D', 'E']
-                    # Asegurar que existan las columnas (a veces el merge cambia nombres)
                     cols_finales = [c for c in cols_mostrar if c in agebs_seleccionados.columns]
                     st.dataframe(agebs_seleccionados[cols_finales])
                 
-                # Botón de Descarga
                 csv = agebs_seleccionados.drop(columns='geometry').to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Descargar esta selección (CSV)",
+                    label="📥 Descargar datos de esta zona (CSV)",
                     data=csv,
                     file_name="seleccion_nse_zona.csv",
                     mime="text/csv",
                 )
             else:
-                st.warning("⚠️ Tu dibujo no tocó ningún AGEB. Intenta dibujar sobre las zonas coloreadas.")
+                st.warning("⚠️ Tu selección no capturó el centro de ningún AGEB. Intenta cubrir más área.")
 
     else:
         st.warning("No hay datos para mostrar.")
