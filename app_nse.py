@@ -104,25 +104,25 @@ try:
     # Aquí estaba el posible error, asegúrate de copiar toda esta línea:
     with st.sidebar.expander("¿Qué significan los colores?"):
         st.markdown("""
-        <div style='background-color: #006400; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #B3B3B3; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>A/B (Alto):</b> Ingresos altos. Total conectividad y servicios.
         </div>
-        <div style='background-color: #32CD32; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #72CF72; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>C+ (Medio Alto):</b> Ingresos superiores al promedio.
         </div>
-        <div style='background-color: #ADFF2F; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #BCEB6D; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>C (Medio):</b> Ingresos promedio. Necesidades cubiertas.
         </div>
-        <div style='background-color: #FFFF00; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #FAF95D; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>C- (Medio Emergente):</b> Vulnerables a crisis leves.
         </div>
-        <div style='background-color: #FFA500; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #EDB552; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>D+ (Bajo Típico):</b> Problemas de infraestructura básica.
         </div>
-        <div style='background-color: #FF4500; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #FC8B63; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>D (Bajo Extremo):</b> Carencia de servicios.
         </div>
-        <div style='background-color: #FF0000; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <div style='background-color: #ED5454; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
         <b>E (Muy Bajo):</b> Escasez grave.
         </div>
         """, unsafe_allow_html=True)
@@ -228,6 +228,7 @@ try:
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
