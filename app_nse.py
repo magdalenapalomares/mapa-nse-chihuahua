@@ -14,11 +14,17 @@ st.set_page_config(page_title="Visor NSE Chihuahua", layout="wide")
 # 1. Cargar datos
 @st.cache_data
 def cargar_datos():
+    # Cargar mapa (INEGI)
     gdf = gpd.read_file("08a.shp")
     gdf = gdf.to_crs(epsg=4326)
+    
+    # Cargar datos (AMAI)
     df = pd.read_csv("NSE_AGEB_Chihuahua_Ready.csv", dtype={'CVEGEO': str})
+    
+    # Limpieza de columna viviendas
     df['VIVIENDAS'] = df['VIVIENDAS'].astype(str).str.replace(',', '')
     df['VIVIENDAS'] = pd.to_numeric(df['VIVIENDAS'], errors='coerce').fillna(0)
+    
     mapa_final = gdf.merge(df, on="CVEGEO", how="inner")
     return mapa_final
 
@@ -26,7 +32,7 @@ try:
     data = cargar_datos()
     
     # --- BARRA LATERAL ---
-    st.sidebar.title("Instrucciones")
+    st.sidebar.title("🎛️ Panel de Control")
     
     # PASO 1
     st.sidebar.markdown("### 👇 Paso 1: Elige tu zona")
@@ -67,7 +73,7 @@ try:
         boton_buscar = st.form_submit_button("Ir al punto 📍")
 
     if boton_buscar and direccion_input:
-        geolocator = Nominatim(user_agent="app_nse_chihuahua_final_v3")
+        geolocator = Nominatim(user_agent="app_nse_chihuahua_fuentes")
         direccion_completa = f"{direccion_input}, {seleccion_nombre}, Chihuahua, México"
         try:
             location = geolocator.geocode(direccion_completa, timeout=10)
@@ -84,118 +90,6 @@ try:
     
     st.sidebar.markdown("---")
     
-    # 🍺 NUEVO: GUÍA DE NIVELES SOCIOECONÓMICOS (AMAI)
+    # GUÍA DE NIVELES (AMAI)
     st.sidebar.markdown("### 📖 Guía de Niveles (AMAI)")
-    with st.sidebar.expander("¿Qué significan los colores?"):
-        st.markdown("""
-        <div style='background-color: #006400; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>A/B (Alto):</b> Ingresos altos. Total conectividad, servicios y ahorros.
-        </div>
-        <div style='background-color: #32CD32; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>C+ (Medio Alto):</b> Ingresos por encima del promedio. Bienestar y entretenimiento.
-        </div>
-        <div style='background-color: #ADFF2F; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>C (Medio):</b> Ingresos promedio. Necesidades cubiertas, sin grandes lujos.
-        </div>
-        <div style='background-color: #FFFF00; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>C- (Medio Emergente):</b> Cubren necesidades básicas, vulnerables a crisis.
-        </div>
-        <div style='background-color: #FFA500; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>D+ (Bajo Típico):</b> Infraestructura básica y problemas de saneamiento.
-        </div>
-        <div style='background-color: #FF4500; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>D (Bajo Extremo):</b> Carencia de servicios y estructura.
-        </div>
-        <div style='background-color: #FF0000; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
-        <b>E (Muy Bajo):</b> Escasez grave de todos los servicios.
-        </div>
-        """, unsafe_allow_html=True)
-        st.caption("Fuente: Regla AMAI 2024")
-
-    # AYUDA
-    with st.sidebar.expander("ℹ️ Ayuda para usar el mapa"):
-        st.markdown("""
-        1. **Filtra:** Usa el menú de arriba para cambiar de ciudad.
-        2. **Dibuja:** Usa las herramientas (⬛ ⬤ ⬠) en el mapa para seleccionar AGEBs.
-        3. **Descarga:** Al dibujar, aparecerá un botón para bajar el Excel.
-        """)
-
-    # ==========================================
-    # TÍTULO Y MAPA
-    # ==========================================
-    st.title(f"🗺️ Nivel Socioeconómico: {seleccion_nombre}")
-    st.markdown(f"Visualizando distribución de riqueza en **{seleccion_nombre}**, Chihuahua.")
-
-    if not data_filtrada.empty:
-        m = folium.Map(
-            location=[st.session_state['lat_vista'], st.session_state['lon_vista']], 
-            zoom_start=st.session_state['zoom_vista']
-        )
-
-        colores_nse = {
-            'AB': '#006400', 'C+': '#32CD32', 'C': '#ADFF2F',
-            'C-': '#FFFF00', 'D+': '#FFA500', 'D': '#FF4500', 'E': '#FF0000'
-        }
-        
-        def style_function(feature):
-            nse = feature['properties']['NIVEL PREDOMINANTE']
-            return {'fillColor': colores_nse.get(nse, 'gray'), 'color': 'black', 'weight': 0.5, 'fillOpacity': 0.6}
-
-        folium.GeoJson(
-            data_filtrada,
-            style_function=style_function,
-            tooltip=folium.GeoJsonTooltip(
-                fields=['NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS'],
-                aliases=['Municipio:', 'NSE:', 'Viviendas:']
-            )
-        ).add_to(m)
-
-        if st.session_state['marcador_memoria']:
-            p = st.session_state['marcador_memoria']
-            folium.Marker([p['lat'], p['lon']], icon=folium.Icon(color="red"), popup=p['texto']).add_to(m)
-
-        draw = Draw(
-            export=False,
-            position='topleft',
-            draw_options={'polyline': False, 'circlemarker': False, 'marker': False},
-            edit_options={'edit': False}
-        )
-        draw.add_to(m)
-
-        output_mapa = st_folium(m, width="100%", height=600)
-
-        if output_mapa and 'last_active_drawing' in output_mapa and output_mapa['last_active_drawing'] is not None:
-            geometry_data = output_mapa['last_active_drawing']['geometry']
-            poligono_usuario = shape(geometry_data)
-            
-            agebs_seleccionados = data_filtrada[data_filtrada.geometry.centroid.within(poligono_usuario)]
-            
-            cantidad_sel = len(agebs_seleccionados)
-            viviendas_sel = int(agebs_seleccionados['VIVIENDAS'].sum())
-            
-            if cantidad_sel > 0:
-                st.markdown("### 📊 Resultados de tu selección")
-                col1, col2 = st.columns(2)
-                col1.metric("AGEBs Capturados", cantidad_sel)
-                col2.metric("Viviendas Totales", f"{viviendas_sel:,}")
-                
-                with st.expander("🔎 Ver detalles de la zona"):
-                    cols_mostrar = ['CVEGEO', 'NIVEL PREDOMINANTE', 'VIVIENDAS', 'AB', 'C+', 'C', 'D+', 'D', 'E']
-                    cols_finales = [c for c in cols_mostrar if c in agebs_seleccionados.columns]
-                    st.dataframe(agebs_seleccionados[cols_finales])
-                
-                csv = agebs_seleccionados.drop(columns='geometry').to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar datos de esta zona (CSV)",
-                    data=csv,
-                    file_name=f"nse_{seleccion_nombre}_seleccion.csv",
-                    mime="text/csv",
-                )
-            else:
-                st.warning("⚠️ Tu selección no capturó el centro de ningún AGEB. Intenta cubrir más área.")
-
-    else:
-        st.warning("No hay datos para mostrar.")
-
-except Exception as e:
-    st.error(f"Error en la aplicación: {e}")
+    with st.sidebar
