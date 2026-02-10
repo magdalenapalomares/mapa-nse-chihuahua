@@ -11,42 +11,41 @@ import json
 # Configuración de la página
 st.set_page_config(page_title="Visor NSE Chihuahua", layout="wide")
 
-st.title("🗺️ Mapa de Nivel Socioeconómico - Chihuahua")
-st.markdown("Herramienta para identificar el NSE predominante, buscar direcciones y **descargar datos por zona**.")
-
 # 1. Cargar datos
 @st.cache_data
 def cargar_datos():
     gdf = gpd.read_file("08a.shp")
     gdf = gdf.to_crs(epsg=4326)
     df = pd.read_csv("NSE_AGEB_Chihuahua_Ready.csv", dtype={'CVEGEO': str})
-    
-    # --- CORRECCIÓN DE DATOS (COMAS Y N/D) ---
-    # 1. Convertimos a texto para poder manipular
-    df['VIVIENDAS'] = df['VIVIENDAS'].astype(str)
-    # 2. Quitamos las comas (ej: "1,200" -> "1200")
-    df['VIVIENDAS'] = df['VIVIENDAS'].str.replace(',', '')
-    # 3. Convertimos a números (los errores o N/D se vuelven 0)
+    df['VIVIENDAS'] = df['VIVIENDAS'].astype(str).str.replace(',', '')
     df['VIVIENDAS'] = pd.to_numeric(df['VIVIENDAS'], errors='coerce').fillna(0)
-    
     mapa_final = gdf.merge(df, on="CVEGEO", how="inner")
     return mapa_final
 
 try:
     data = cargar_datos()
     
-    # --- BARRA LATERAL ---
-    st.sidebar.header("Filtros")
-    lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
-    seleccion_nombre = st.sidebar.selectbox("Selecciona un Municipio:", lista_nombres)
+    # --- BARRA LATERAL (MEJORADA VISUALMENTE) ---
+    st.sidebar.title("🎛️ Panel de Control")
     
-    # Filtrar datos por municipio
+    # 🍺 MEJORA 1: Llamada a la acción clara
+    st.sidebar.markdown("### 👇 Paso 1: Elige tu zona")
+    st.sidebar.info("Selecciona el municipio que quieres analizar para actualizar el mapa.")
+    
+    lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
+    # Índice por defecto: Chihuahua (si existe) o el primero
+    index_def = lista_nombres.index('Chihuahua') if 'Chihuahua' in lista_nombres else 0
+    seleccion_nombre = st.sidebar.selectbox("Municipio:", lista_nombres, index=index_def)
+    
+    # Filtrar datos
     data_filtrada = data[data['NOMBRE MUNICIPIO'] == seleccion_nombre]
     
-    # Métricas GENERALES (Del Municipio)
-    st.sidebar.metric("Total AGEBs en Municipio", len(data_filtrada))
+    # Métricas
     total_viviendas = int(data_filtrada['VIVIENDAS'].sum())
-    st.sidebar.write(f"🏠 **Viviendas (Municipio):** {total_viviendas:,}")
+    col_metric1, col_metric2 = st.sidebar.columns(2)
+    col_metric1.metric("AGEBs", len(data_filtrada))
+    col_metric2.metric("Viviendas", f"{total_viviendas:,}")
+    
     st.sidebar.markdown("---")
 
     # --- CEREBRO (SESSION STATE) ---
@@ -65,13 +64,13 @@ try:
         st.session_state['ultimo_municipio'] = seleccion_nombre
 
     # --- BUSCADOR ---
-    st.sidebar.header("🔍 Buscador")
+    st.sidebar.markdown("### 🔎 Paso 2: Ubica una dirección")
     with st.sidebar.form(key='form_busqueda'):
         direccion_input = st.text_input("Calle y número:", placeholder="Ej: Av. Universidad 123")
-        boton_buscar = st.form_submit_button("Buscar 📍")
+        boton_buscar = st.form_submit_button("Ir al punto 📍")
 
     if boton_buscar and direccion_input:
-        geolocator = Nominatim(user_agent="app_nse_chihuahua_pro_v2")
+        geolocator = Nominatim(user_agent="app_nse_chihuahua_final")
         direccion_completa = f"{direccion_input}, {seleccion_nombre}, Chihuahua, México"
         try:
             location = geolocator.geocode(direccion_completa, timeout=10)
@@ -80,14 +79,29 @@ try:
                 st.session_state['lon_vista'] = location.longitude
                 st.session_state['zoom_vista'] = 16
                 st.session_state['marcador_memoria'] = {'lat': location.latitude, 'lon': location.longitude, 'texto': direccion_input}
-                st.success("Dirección encontrada.")
+                st.success(f"📍 ¡Encontrado! Mostrando: {direccion_input}")
             else:
-                st.warning("No se encontró la dirección.")
+                st.warning("No se encontró. Intenta añadir la Colonia.")
         except Exception:
             st.error("Error de conexión.")
+    
+    # 🍺 MEJORA 2: Sección de Ayuda
+    with st.sidebar.expander("ℹ️ Ayuda y Tips"):
+        st.markdown("""
+        1. **Filtra:** Cambia de municipio arriba.
+        2. **Busca:** Escribe una calle para hacer zoom.
+        3. **Dibuja:** Usa las herramientas (⬛ ⬤ ⬠) en el mapa para seleccionar una zona y descargar los datos.
+        """)
 
     # ==========================================
-    # 3. MAPA
+    # 3. TÍTULO PRINCIPAL DINÁMICO
+    # ==========================================
+    # 🍺 MEJORA 3: El título cambia según lo que seleccionas
+    st.title(f"🗺️ Nivel Socioeconómico: {seleccion_nombre}")
+    st.markdown(f"Visualizando distribución de riqueza en **{seleccion_nombre}**, Chihuahua.")
+
+    # ==========================================
+    # 4. MAPA
     # ==========================================
     if not data_filtrada.empty:
         m = folium.Map(
@@ -108,8 +122,8 @@ try:
             data_filtrada,
             style_function=style_function,
             tooltip=folium.GeoJsonTooltip(
-                fields=['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS'],
-                aliases=['Clave AGEB:', 'Municipio:', 'NSE Predominante:', 'Viviendas:']
+                fields=['NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS'],
+                aliases=['Municipio:', 'NSE:', 'Viviendas:']
             )
         ).add_to(m)
 
@@ -127,32 +141,24 @@ try:
 
         output_mapa = st_folium(m, width="100%", height=600)
 
-        # ==========================================
-        # 4. CÁLCULO DE SELECCIÓN (CORREGIDO)
-        # ==========================================
+        # CÁLCULO DE SELECCIÓN
         if output_mapa and 'last_active_drawing' in output_mapa and output_mapa['last_active_drawing'] is not None:
             geometry_data = output_mapa['last_active_drawing']['geometry']
             poligono_usuario = shape(geometry_data)
             
-            # --- CAMBIO IMPORTANTE: Usamos 'within' (dentro) en vez de 'intersects' ---
-            # OJO: 'within' es muy estricto (todo el poligono debe estar dentro). 
-            # 'intersects' es muy laxo (basta que toque).
-            # El punto medio es usar el CENTROIDE. Si el centro del AGEB está en tu dibujo, cuenta.
-            
-            # Buscamos AGEBs cuyo centroide esté dentro del dibujo
             agebs_seleccionados = data_filtrada[data_filtrada.geometry.centroid.within(poligono_usuario)]
             
             cantidad_sel = len(agebs_seleccionados)
-            viviendas_sel = int(agebs_seleccionados['VIVIENDAS'].sum()) # Suma de la selección
+            viviendas_sel = int(agebs_seleccionados['VIVIENDAS'].sum())
             
             if cantidad_sel > 0:
-                # Mostramos métricas específicas de la selección
+                st.markdown("### 📊 Resultados de tu selección")
                 col1, col2 = st.columns(2)
-                col1.metric("AGEBs Seleccionados", cantidad_sel)
-                col2.metric("Viviendas en Selección", f"{viviendas_sel:,}") # Aquí está el dato que buscabas
+                col1.metric("AGEBs Capturados", cantidad_sel)
+                col2.metric("Viviendas Totales", f"{viviendas_sel:,}")
                 
-                with st.expander("Ver desglose de datos"):
-                    cols_mostrar = ['CVEGEO', 'NOMBRE MUNICIPIO', 'NIVEL PREDOMINANTE', 'VIVIENDAS', 'AB', 'C+', 'C', 'D+', 'D', 'E']
+                with st.expander("🔎 Ver detalles de la zona"):
+                    cols_mostrar = ['CVEGEO', 'NIVEL PREDOMINANTE', 'VIVIENDAS', 'AB', 'C+', 'C', 'D+', 'D', 'E']
                     cols_finales = [c for c in cols_mostrar if c in agebs_seleccionados.columns]
                     st.dataframe(agebs_seleccionados[cols_finales])
                 
@@ -160,7 +166,7 @@ try:
                 st.download_button(
                     label="📥 Descargar datos de esta zona (CSV)",
                     data=csv,
-                    file_name="seleccion_nse_zona.csv",
+                    file_name=f"nse_{seleccion_nombre}_seleccion.csv",
                     mime="text/csv",
                 )
             else:
