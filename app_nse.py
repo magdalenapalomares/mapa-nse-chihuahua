@@ -100,7 +100,7 @@ try:
     st.sidebar.markdown("---")
     
     # --- GUÍA DE NIVELES (AMAI) ---
-    st.sidebar.markdown("### 📖 Guía de Niveles (AMAI)")
+    st.sidebar.markdown("### 📖 Guía de Niveles Socioeconómicos (AMAI)")
     # Aquí estaba el posible error, asegúrate de copiar toda esta línea:
     with st.sidebar.expander("¿Qué significan los colores?"):
         st.markdown("""
@@ -228,5 +228,6 @@ try:
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
+
 
 
