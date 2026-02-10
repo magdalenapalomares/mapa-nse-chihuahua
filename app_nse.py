@@ -144,7 +144,7 @@ try:
     # TÍTULO Y MAPA PRINCIPAL
     # ==========================================
     st.title(f"🗺️ Nivel Socioeconómico: {seleccion_nombre}")
-    st.markdown(f"Visualizando distribución de riqueza en **{seleccion_nombre}**, Chihuahua.")
+    st.markdown(f"Visualizando distribución de NSE en **{seleccion_nombre}**, Chihuahua.")
 
     if not data_filtrada.empty:
         # Crear el mapa base con la vista guardada en memoria
@@ -228,3 +228,4 @@ try:
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
+
