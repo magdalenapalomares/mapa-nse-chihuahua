@@ -25,15 +25,12 @@ def cargar_datos():
 try:
     data = cargar_datos()
     
-    # --- BARRA LATERAL (MEJORADA VISUALMENTE) ---
-    st.sidebar.title("🎛️ Panel de Control")
+    # --- BARRA LATERAL ---
+    st.sidebar.title("Instrucciones")
     
-    # 🍺 MEJORA 1: Llamada a la acción clara
+    # PASO 1
     st.sidebar.markdown("### 👇 Paso 1: Elige tu zona")
-    st.sidebar.info("Selecciona el municipio que quieres analizar para actualizar el mapa.")
-    
     lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
-    # Índice por defecto: Chihuahua (si existe) o el primero
     index_def = lista_nombres.index('Chihuahua') if 'Chihuahua' in lista_nombres else 0
     seleccion_nombre = st.sidebar.selectbox("Municipio:", lista_nombres, index=index_def)
     
@@ -63,14 +60,14 @@ try:
         st.session_state['marcador_memoria'] = None
         st.session_state['ultimo_municipio'] = seleccion_nombre
 
-    # --- BUSCADOR ---
+    # PASO 2: BUSCADOR
     st.sidebar.markdown("### 🔎 Paso 2: Ubica una dirección")
     with st.sidebar.form(key='form_busqueda'):
         direccion_input = st.text_input("Calle y número:", placeholder="Ej: Av. Universidad 123")
         boton_buscar = st.form_submit_button("Ir al punto 📍")
 
     if boton_buscar and direccion_input:
-        geolocator = Nominatim(user_agent="app_nse_chihuahua_final")
+        geolocator = Nominatim(user_agent="app_nse_chihuahua_final_v3")
         direccion_completa = f"{direccion_input}, {seleccion_nombre}, Chihuahua, México"
         try:
             location = geolocator.geocode(direccion_completa, timeout=10)
@@ -79,30 +76,56 @@ try:
                 st.session_state['lon_vista'] = location.longitude
                 st.session_state['zoom_vista'] = 16
                 st.session_state['marcador_memoria'] = {'lat': location.latitude, 'lon': location.longitude, 'texto': direccion_input}
-                st.success(f"📍 ¡Encontrado! Mostrando: {direccion_input}")
+                st.success(f"📍 ¡Encontrado!")
             else:
                 st.warning("No se encontró. Intenta añadir la Colonia.")
         except Exception:
             st.error("Error de conexión.")
     
-    # 🍺 MEJORA 2: Sección de Ayuda
-    with st.sidebar.expander("ℹ️ Ayuda y Tips"):
+    st.sidebar.markdown("---")
+    
+    # 🍺 NUEVO: GUÍA DE NIVELES SOCIOECONÓMICOS (AMAI)
+    st.sidebar.markdown("### 📖 Guía de Niveles (AMAI)")
+    with st.sidebar.expander("¿Qué significan los colores?"):
         st.markdown("""
-        1. **Filtra:** Cambia de municipio arriba.
-        2. **Busca:** Escribe una calle para hacer zoom.
-        3. **Dibuja:** Usa las herramientas (⬛ ⬤ ⬠) en el mapa para seleccionar una zona y descargar los datos.
+        <div style='background-color: #006400; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>A/B (Alto):</b> Ingresos altos. Total conectividad, servicios y ahorros.
+        </div>
+        <div style='background-color: #32CD32; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>C+ (Medio Alto):</b> Ingresos por encima del promedio. Bienestar y entretenimiento.
+        </div>
+        <div style='background-color: #ADFF2F; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>C (Medio):</b> Ingresos promedio. Necesidades cubiertas, sin grandes lujos.
+        </div>
+        <div style='background-color: #FFFF00; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>C- (Medio Emergente):</b> Cubren necesidades básicas, vulnerables a crisis.
+        </div>
+        <div style='background-color: #FFA500; color: black; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>D+ (Bajo Típico):</b> Infraestructura básica y problemas de saneamiento.
+        </div>
+        <div style='background-color: #FF4500; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>D (Bajo Extremo):</b> Carencia de servicios y estructura.
+        </div>
+        <div style='background-color: #FF0000; color: white; padding: 5px; border-radius: 5px; margin-bottom: 5px;'>
+        <b>E (Muy Bajo):</b> Escasez grave de todos los servicios.
+        </div>
+        """, unsafe_allow_html=True)
+        st.caption("Fuente: Regla AMAI 2024")
+
+    # AYUDA
+    with st.sidebar.expander("ℹ️ Ayuda para usar el mapa"):
+        st.markdown("""
+        1. **Filtra:** Usa el menú de arriba para cambiar de ciudad.
+        2. **Dibuja:** Usa las herramientas (⬛ ⬤ ⬠) en el mapa para seleccionar AGEBs.
+        3. **Descarga:** Al dibujar, aparecerá un botón para bajar el Excel.
         """)
 
     # ==========================================
-    # 3. TÍTULO PRINCIPAL DINÁMICO
+    # TÍTULO Y MAPA
     # ==========================================
-    # 🍺 MEJORA 3: El título cambia según lo que seleccionas
     st.title(f"🗺️ Nivel Socioeconómico: {seleccion_nombre}")
     st.markdown(f"Visualizando distribución de riqueza en **{seleccion_nombre}**, Chihuahua.")
 
-    # ==========================================
-    # 4. MAPA
-    # ==========================================
     if not data_filtrada.empty:
         m = folium.Map(
             location=[st.session_state['lat_vista'], st.session_state['lon_vista']], 
@@ -141,7 +164,6 @@ try:
 
         output_mapa = st_folium(m, width="100%", height=600)
 
-        # CÁLCULO DE SELECCIÓN
         if output_mapa and 'last_active_drawing' in output_mapa and output_mapa['last_active_drawing'] is not None:
             geometry_data = output_mapa['last_active_drawing']['geometry']
             poligono_usuario = shape(geometry_data)
