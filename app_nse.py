@@ -37,7 +37,7 @@ try:
     st.sidebar.title("Navegación")
     
     # --- PASO 1: SELECTOR DE MUNICIPIO ---
-    st.sidebar.markdown("### 👇 Opción 1: Elige tu zona")
+    st.sidebar.markdown("### 👇 Paso 1: Elige tu zona")
     lista_nombres = sorted(data['NOMBRE MUNICIPIO'].unique())
     # Intentamos seleccionar 'Chihuahua' por defecto
     index_def = lista_nombres.index('Chihuahua') if 'Chihuahua' in lista_nombres else 0
@@ -72,7 +72,7 @@ try:
         st.session_state['ultimo_municipio'] = seleccion_nombre
 
     # --- PASO 2: BUSCADOR DE DIRECCIONES ---
-    st.sidebar.markdown("### 🔎 Opción 2: Ubica una dirección")
+    st.sidebar.markdown("### 🔎 Paso 2: Ubica una dirección")
     with st.sidebar.form(key='form_busqueda'):
         direccion_input = st.text_input("Calle y número:", placeholder="Ej: Av. Universidad 123")
         boton_buscar = st.form_submit_button("Ir al punto 📍")
@@ -228,6 +228,7 @@ try:
 
 except Exception as e:
     st.error(f"Error en la aplicación: {e}")
+
 
 
 
